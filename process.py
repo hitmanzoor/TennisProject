@@ -507,4 +507,8 @@ def main():
 
 
 if __name__ == "__main__":
+
+    video = cv2.VideoCapture('videos/novak_1.mp4')
+    video.release()
+    cv2.destroyAllWindows()
     main()
