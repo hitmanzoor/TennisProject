@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 class DetectionModel:
     def __init__(self, dtype=torch.FloatTensor):
-        self.detection_model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+        self.detection_model = torchvision.models.detection.fasterrcnn_resnet50_fpn(weights="DEFAULT")
         self.detection_model.type(dtype)  # Also moves model to GPU if available
         self.detection_model.eval()
         self.dtype = dtype

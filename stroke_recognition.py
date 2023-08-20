@@ -25,7 +25,7 @@ class Identity(nn.Module):
 class FeatureExtractor(nn.Module):
     def __init__(self):
         super().__init__()
-        self.feature_extractor = torchvision.models.inception_v3(pretrained=True)
+        self.feature_extractor = torchvision.models.inception_v3(weights=torchvision.models.Inception_V3_Weights.DEFAULT)
         self.feature_extractor.fc = Identity()
 
     def forward(self, x):

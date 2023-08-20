@@ -3,6 +3,7 @@ import time
 
 import cv2
 import numpy as np
+import torch.cuda
 from scipy import signal
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
@@ -508,7 +509,5 @@ def main():
 
 if __name__ == "__main__":
 
-    video = cv2.VideoCapture('videos/novak_1.mp4')
-    video.release()
-    cv2.destroyAllWindows()
+    print(torch.cuda.is_available())
     main()

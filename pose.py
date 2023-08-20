@@ -14,7 +14,7 @@ class PoseExtractor:
         :param box: bool, show person bounding box in the output frame (default = False)
         :param dtype: torch.type, dtype of the mdoel and image, determine if we use GPU or not
         """
-        self.pose_model = torchvision.models.detection.keypointrcnn_resnet50_fpn(pretrained=True)
+        self.pose_model = torchvision.models.detection.keypointrcnn_resnet50_fpn(weights="DEFAULT")
         self.pose_model.type(dtype)  # Also moves model to GPU if available
         self.pose_model.eval()
         self.dtype = dtype
