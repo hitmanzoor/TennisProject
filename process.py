@@ -540,7 +540,7 @@ def video_process(video_path, show_video=False, include_video=True,
     V = []
 
     gg = ball_detector.time_t[2]
-    ball_detector.time_t[0], ball_detector.time_t[1] = gg, gg
+    ball_detector.time_t[0], ball_detector.time_t[1] = gg - (2 * (gg/3)), gg - (gg/3)
     t = ball_detector.time_t
 
     for i in range(len(coords) - 1):
@@ -596,6 +596,8 @@ def video_process(video_path, show_video=False, include_video=True,
         Vs = from_2d_array_to_nested(Vs.to_numpy())
 
         X = pd.concat([Xs, Ys, Vs], 1)
+
+
 
         # load the pre-trained classifier
         clf = load(open('saved states/clf.pkl', 'rb'))
