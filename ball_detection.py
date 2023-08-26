@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import torch
+
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
 from scipy import signal
@@ -10,6 +11,7 @@ from ball_tracker_net import BallTrackerNet
 from detection import center_of_box
 from utils import get_video_properties
 
+import time
 
 def combine_three_frames(frame1, frame2, frame3, width, height):
     """
@@ -38,7 +40,6 @@ def combine_three_frames(frame1, frame2, frame3, width, height):
     imgs = np.rollaxis(imgs, 2, 0)
     return np.array(imgs)
 
-
 class BallDetector:
     """
     Ball Detector model responsible for receiving the frames and detecting the ball
@@ -64,12 +65,14 @@ class BallDetector:
         self.xy_coordinates = np.array([[None, None], [None, None]])
 
         self.bounces_indices = []
+        self.time_t = np.array([None, None])
 
-    def detect_ball(self, frame):
+    def detect_ball(self, frame, start_time):
         """
         After receiving 3 consecutive frames, the ball will be detected using TrackNet model
         :param frame: current frame
         """
+
         # Save frame dimensions
         if self.video_width is None:
             self.video_width = frame.shape[1]
@@ -96,6 +99,7 @@ class BallDetector:
                     if np.linalg.norm(np.array([x,y]) - self.xy_coordinates[-1]) > self.threshold_dist:
                         x, y = None, None
             self.xy_coordinates = np.append(self.xy_coordinates, np.array([[x, y]]), axis=0)
+            self.time_t = np.append(self.time_t, time.time()- start_time)
 
     def mark_positions(self, frame, mark_num=4, frame_num=None, ball_color='yellow'):
         """

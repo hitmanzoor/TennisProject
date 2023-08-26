@@ -4,6 +4,8 @@ import time
 import cv2
 import numpy as np
 import torch.cuda
+import pandas as pd
+
 from scipy import signal
 from scipy.interpolate import interp1d
 from scipy.signal import find_peaks
@@ -14,9 +16,13 @@ from smooth import Smooth
 from ball_detection import BallDetector
 from statistics import Statistics
 from stroke_recognition import ActionRecognition
-from utils import get_video_properties, get_dtype, get_stickman_line_connection
+from utils import \
+    get_video_properties, get_dtype, get_stickman_line_connection,\
+    interpolation, diff_xy, remove_outliers, from_2d_array_to_nested
 from court_detection import CourtDetector
 import matplotlib.pyplot as plt
+
+from pickle import load
 
 
 def get_stroke_predictions(video_path, stroke_recognition, strokes_frames, player_boxes):
@@ -442,8 +448,6 @@ def video_process(video_path, show_video=False, include_video=True,
             if stickman:
                 pose_extractor.extract_pose(frame, detection_model.player_1_boxes)
 
-            ball_detector.detect_ball(court_detector.delete_extra_parts(frame))
-
             total_time += (time.time() - start_time)
             print('Processing frame %d/%d  FPS %04f' % (frame_i, length, frame_i / total_time), '\r', end='')
             if not frame_i % 100:
@@ -453,12 +457,42 @@ def video_process(video_path, show_video=False, include_video=True,
     print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
     print('Processing completed')
     video.release()
+
+    # Ball Detection Section
+    video = cv2.VideoCapture(video_path)
+
+    # get videos properties
+    fps, length, v_width, v_height = get_video_properties(video)
+    # frame counter
+    frame_i = 0
+    # time counter
+    total_time = 0
+
+    start_time_ball = time.time()
+    while True:
+        start_time = time.time()
+        ret, frame = video.read()
+        frame_i += 1
+
+        if ret:
+            ball_detector.detect_ball(court_detector.delete_extra_parts(frame), start_time=start_time_ball)
+
+            total_time += (time.time() - start_time)
+            print('Processing frame %d/%d  FPS %04f' % (frame_i, length, frame_i / total_time), '\r', end='')
+            if not frame_i % 100:
+                print('')
+        else:
+            break
+    print('Processing frame %d/%d  FPS %04f' % (length, length, length / total_time), '\n', end='')
+    print('Processing completed')
+
+    video.release()
     cv2.destroyAllWindows()
 
     detection_model.find_player_2_box()
 
-    if top_view:
-        create_top_view(court_detector, detection_model)
+    # if top_view:
+    #     create_top_view(court_detector, detection_model)
 
     # Save landmarks in csv files
     df = None
@@ -481,6 +515,7 @@ def video_process(video_path, show_video=False, include_video=True,
 
     '''ball_detector.bounces_indices = bounces_indices
     ball_detector.coordinates = (f2_x, f2_y)'''
+
     predictions = get_stroke_predictions(video_path, stroke_recognition,
                                          player_1_strokes_indices, detection_model.player_1_boxes)
 
@@ -489,7 +524,117 @@ def video_process(video_path, show_video=False, include_video=True,
     statistics.display_heatmap(heatmap, court_detector.court_reference.court, title='Heatmap')
     statistics.get_players_dists()
 
-    print('tainja omade')
+    # Detect ball hiting the court
+    coords = ball_detector.xy_coordinates
+
+    # interpolation
+    coords = interpolation(coords)
+
+    for _ in range(3):
+        x, y = diff_xy(coords)
+        remove_outliers(x, y, coords)
+
+    # velocty
+    Vx = []
+    Vy = []
+    V = []
+
+    gg = ball_detector.time_t[2]
+    ball_detector.time_t[0], ball_detector.time_t[1] = gg, gg
+    t = ball_detector.time_t
+
+    for i in range(len(coords) - 1):
+        p1 = coords[i]
+        p2 = coords[i + 1]
+        t1 = t[i]
+        t2 = t[i + 1]
+        x = (p1[0] - p2[0]) / (t1 - t2)
+        y = (p1[1] - p2[1]) / (t1 - t2)
+        Vx.append(x)
+        Vy.append(y)
+
+    for i in range(len(Vx)):
+        vx = Vx[i]
+        vy = Vy[i]
+        v = (vx ** 2 + vy ** 2) ** 0.5
+        V.append(v)
+
+    xy = coords[:]
+
+    ball_bounce= 1
+
+    if ball_bounce == 1:
+        # Predicting Bounces
+        test_df = pd.DataFrame({'x': [coord[0] for coord in xy[:-1]], 'y': [coord[1] for coord in xy[:-1]], 'V': V})
+
+        # df.shift
+        for i in range(20, 0, -1):
+            test_df[f'lagX_{i}'] = test_df['x'].shift(i, fill_value=0)
+        for i in range(20, 0, -1):
+            test_df[f'lagY_{i}'] = test_df['y'].shift(i, fill_value=0)
+        for i in range(20, 0, -1):
+            test_df[f'lagV_{i}'] = test_df['V'].shift(i, fill_value=0)
+
+        test_df.drop(['x', 'y', 'V'], 1, inplace=True)
+
+        Xs = test_df[['lagX_20', 'lagX_19', 'lagX_18', 'lagX_17', 'lagX_16',
+                      'lagX_15', 'lagX_14', 'lagX_13', 'lagX_12', 'lagX_11', 'lagX_10',
+                      'lagX_9', 'lagX_8', 'lagX_7', 'lagX_6', 'lagX_5', 'lagX_4', 'lagX_3',
+                      'lagX_2', 'lagX_1']]
+        Xs = from_2d_array_to_nested(Xs.to_numpy())
+
+        Ys = test_df[['lagY_20', 'lagY_19', 'lagY_18', 'lagY_17',
+                      'lagY_16', 'lagY_15', 'lagY_14', 'lagY_13', 'lagY_12', 'lagY_11',
+                      'lagY_10', 'lagY_9', 'lagY_8', 'lagY_7', 'lagY_6', 'lagY_5', 'lagY_4',
+                      'lagY_3', 'lagY_2', 'lagY_1']]
+        Ys = from_2d_array_to_nested(Ys.to_numpy())
+
+        Vs = test_df[['lagV_20', 'lagV_19', 'lagV_18',
+                      'lagV_17', 'lagV_16', 'lagV_15', 'lagV_14', 'lagV_13', 'lagV_12',
+                      'lagV_11', 'lagV_10', 'lagV_9', 'lagV_8', 'lagV_7', 'lagV_6', 'lagV_5',
+                      'lagV_4', 'lagV_3', 'lagV_2', 'lagV_1']]
+        Vs = from_2d_array_to_nested(Vs.to_numpy())
+
+        X = pd.concat([Xs, Ys, Vs], 1)
+
+        # load the pre-trained classifier
+        clf = load(open('saved states/clf.pkl', 'rb'))
+
+        predcted = clf.predict(X)
+        idx = list(np.where(predcted == 1)[0])
+        idx = np.array(idx) - 10
+
+        output_video_path= os.path.join(output_folder, output_file + '.avi')
+        video = cv2.VideoCapture(output_video_path)
+
+        output_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        output_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = int(video.get(cv2.CAP_PROP_FPS))
+        length = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+
+        print(fps)
+        print(length)
+
+        output_video = cv2.VideoWriter('VideoOutput/final_video.mp4', fourcc, fps, (output_width, output_height))
+        i = 0
+        while True:
+            ret, frame = video.read()
+            if ret:
+                # if coords[i] is not None:
+                if i in idx:
+                    center_coordinates = int(xy[i][0]), int(xy[i][1])
+                    radius = 3
+                    color = (255, 0, 0)
+                    thickness = -1
+                    cv2.circle(frame, center_coordinates, 10, color, thickness)
+                i += 1
+                output_video.write(frame)
+            else:
+                break
+
+        video.release()
+        output_video.release()
 
     add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
                       ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
@@ -502,12 +647,10 @@ def video_process(video_path, show_video=False, include_video=True,
 
 def main():
     s = time.time()
-    video_process(video_path='videos/novak_2.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path='videos/ten1.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=True, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 
 
 if __name__ == "__main__":
-
-    print(torch.cuda.is_available())
     main()
