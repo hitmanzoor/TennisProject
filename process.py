@@ -21,9 +21,7 @@ from utils import \
     interpolation, diff_xy, remove_outliers, from_2d_array_to_nested
 from court_detection import CourtDetector
 import matplotlib.pyplot as plt
-
-from pickle import load
-
+import pickle
 
 def get_stroke_predictions(video_path, stroke_recognition, strokes_frames, player_boxes):
     """
@@ -598,7 +596,7 @@ def video_process(video_path, show_video=False, include_video=True,
         X = pd.concat([Xs, Ys, Vs], 1)
 
         # load the pre-trained classifier
-        clf = load(open('saved states/clf.pkl', 'rb'))
+        clf = pickle.load(open('saved states/model.pkl', 'rb'))
 
         predcted = clf.predict(X)
         idx = list(np.where(predcted == 1)[0])
