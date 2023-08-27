@@ -597,8 +597,6 @@ def video_process(video_path, show_video=False, include_video=True,
 
         X = pd.concat([Xs, Ys, Vs], 1)
 
-
-
         # load the pre-trained classifier
         clf = load(open('saved states/clf.pkl', 'rb'))
 
