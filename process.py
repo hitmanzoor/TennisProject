@@ -524,7 +524,9 @@ def video_process(video_path, show_video=False, include_video=True,
 
     # Detect ball hiting the court
     coords = ball_detector.xy_coordinates
+    np.savez_compressed('saved states/coords', coords=coords)
 
+    coords_loaded = np.load('saved states/coords')['coords']
     # interpolation
     coords = interpolation(coords)
 
@@ -593,46 +595,59 @@ def video_process(video_path, show_video=False, include_video=True,
                       'lagV_4', 'lagV_3', 'lagV_2', 'lagV_1']]
         Vs = from_2d_array_to_nested(Vs.to_numpy())
 
+
         X = pd.concat([Xs, Ys, Vs], 1)
+        X.columns = ['dim_0', 'dim_1', 'dim_2']
 
+        x_test = X.to_numpy()
+
+        x_test_t = np.empty((x_test.shape[0], 3 * 20))
+        for i in range(x_test.shape[0]):
+            for j in range(x_test.shape[1]):
+                for m in range(20):
+                    x_test_t[i, (j * 20) + m] = x_test[i, j][m]
+
+        test_df2 = test_df.to_numpy()
         # load the pre-trained classifier
-        clf = pickle.load(open('saved states/model.pkl', 'rb'))
+        clf = pickle.load(open('saved states/model2.pkl', 'rb'))
 
-        predcted = clf.predict(X)
+        predcted = clf.predict(test_df2)
         idx = list(np.where(predcted == 1)[0])
         idx = np.array(idx) - 10
 
-        output_video_path= os.path.join(output_folder, output_file + '.avi')
-        video = cv2.VideoCapture(output_video_path)
+        print(predcted)
 
-        output_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-        output_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(video.get(cv2.CAP_PROP_FPS))
-        length = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
-        print(fps)
-        print(length)
-
-        output_video = cv2.VideoWriter('VideoOutput/final_video.mp4', fourcc, fps, (output_width, output_height))
-        i = 0
-        while True:
-            ret, frame = video.read()
-            if ret:
-                # if coords[i] is not None:
-                if i in idx:
-                    center_coordinates = int(xy[i][0]), int(xy[i][1])
-                    radius = 3
-                    color = (255, 0, 0)
-                    thickness = -1
-                    cv2.circle(frame, center_coordinates, 10, color, thickness)
-                i += 1
-                output_video.write(frame)
-            else:
-                break
-
-        video.release()
-        output_video.release()
+        # output_video_path= os.path.join(output_folder, output_file + '.avi')
+        # video = cv2.VideoCapture(output_video_path)
+        #
+        # output_width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+        # output_height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # fps = int(video.get(cv2.CAP_PROP_FPS))
+        # length = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        #
+        # print(fps)
+        # print(length)
+        #
+        # output_video = cv2.VideoWriter('VideoOutput/final_video.mp4', fourcc, fps, (output_width, output_height))
+        # i = 0
+        # while True:
+        #     ret, frame = video.read()
+        #     if ret:
+        #         # if coords[i] is not None:
+        #         if i in idx:
+        #             center_coordinates = int(xy[i][0]), int(xy[i][1])
+        #             radius = 3
+        #             color = (255, 0, 0)
+        #             thickness = -1
+        #             cv2.circle(frame, center_coordinates, 10, color, thickness)
+        #         i += 1
+        #         output_video.write(frame)
+        #     else:
+        #         break
+        #
+        # video.release()
+        # output_video.release()
 
     add_data_to_video(input_video=video_path, court_detector=court_detector, players_detector=detection_model,
                       ball_detector=ball_detector, strokes_predictions=predictions, skeleton_df=df_smooth,
@@ -645,7 +660,7 @@ def video_process(video_path, show_video=False, include_video=True,
 
 def main():
     s = time.time()
-    video_process(video_path='videos/ten1.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
+    video_process(video_path='videos/novak_2.mp4', show_video=True, stickman=True, stickman_box=False, smoothing=True,
                   court=True, top_view=True)
     print(f'Total computation time : {time.time() - s} seconds')
 

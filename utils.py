@@ -65,6 +65,8 @@ def interpolation(coords):
     coords = coords.copy()
     x, y = [x[0] if x[0] is not None else np.nan for x in coords], [x[1] if x[1] is not None else np.nan for x in coords]
 
+
+
     xxx = np.array(x)  # x coords
     yyy = np.array(y)  # y coords
 
